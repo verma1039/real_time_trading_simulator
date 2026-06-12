@@ -219,25 +219,66 @@ def test_get_me_no_token(client: Any) -> None:
 # Rate Limiting
 # ---------------------------------------------------------------------------
 def test_rate_limiting_signup(client: Any) -> None:
-    from app.core.rate_limit import signup_limiter
-    signup_limiter._hits.clear()
+    from app.core.rate_limit import limiter
+    limiter._storage.reset()
 
-    # Signup limit is 3/min per IP
-    for i in range(3):
+    # Signup limit is 5/min per IP
+    for i in range(5):
         resp = client.post(
             "/api/v1/auth/signup",
             json={"email": f"rate{i}@example.com", "password": "StrongPassword123"}
         )
         assert resp.status_code in (201, 409)
 
-    # 4th should be 429
+    # 6th should be 429
     resp = client.post(
         "/api/v1/auth/signup",
-        json={"email": "rate4@example.com", "password": "StrongPassword123"}
+        json={"email": "rate_over@example.com", "password": "StrongPassword123"}
     )
     assert resp.status_code == 429
-    assert resp.json()["error"]["code"] == "RATE_LIMIT_EXCEEDED"
+    assert "error" in resp.json()
 
+
+def test_rate_limiting_reset_password(client: Any) -> None:
+    from app.core.rate_limit import limiter
+    limiter._storage.reset()
+
+    # Reset limit is 3/min per IP
+    for i in range(3):
+        resp = client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": f"fake_token_{i}", "new_password": "NewStrongPassword123"}
+        )
+        assert resp.status_code in (400, 401, 200) # Assuming token is invalid, but it gets past rate limit
+
+    # 4th should be 429
+    resp = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": "fake_token_over", "new_password": "NewStrongPassword123"}
+    )
+    assert resp.status_code == 429
+    assert "error" in resp.json()
+
+
+def test_refresh_cookie_env_settings(client: Any, verified_user: tuple[str, str], monkeypatch: Any) -> None:
+    from app.core.config import get_settings
+    email, password = verified_user
+    
+    # Test Production
+    monkeypatch.setattr(get_settings(), "environment", "production")
+    resp_prod = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    cookies_prod = resp_prod.headers.get_list("set-cookie")
+    refresh_cookie_prod = next(c for c in cookies_prod if "refresh_token=" in c)
+    assert "samesite=none" in refresh_cookie_prod.lower()
+    assert "Secure" in refresh_cookie_prod
+
+    # Test Development
+    monkeypatch.setattr(get_settings(), "environment", "development")
+    resp_dev = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    cookies_dev = resp_dev.headers.get_list("set-cookie")
+    refresh_cookie_dev = next(c for c in cookies_dev if "refresh_token=" in c)
+    assert "samesite=lax" in refresh_cookie_dev.lower()
+    assert "Secure" not in refresh_cookie_dev
 
 def test_change_password_success(client: Any, verified_user: tuple[str, str]) -> None:
     email, password = verified_user

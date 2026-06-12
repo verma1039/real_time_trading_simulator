@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.deps import CurrentVerifiedUser, get_current_user
 from app.core.errors import UnauthorizedError
-from app.core.rate_limit import (
-    forgot_password_limiter,
-    login_limiter,
-    signup_limiter,
-)
+from app.core.rate_limit import limiter
 from app.db import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
@@ -35,6 +31,7 @@ _REFRESH_COOKIE_NAME = "refresh_token"
 def _set_refresh_cookie(response: Response, token: str) -> None:
     settings = get_settings()
     max_age = settings.jwt_refresh_expire_days * 24 * 60 * 60
+    is_prod = settings.environment == "production"
     response.set_cookie(
         key=_REFRESH_COOKIE_NAME,
         value=token,
@@ -42,9 +39,9 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         expires=max_age,
         path="/api/v1/auth",  # Scoped tightly
         domain=None,
-        secure=settings.environment == "production",
+        secure=is_prod,
         httponly=True,
-        samesite="lax",
+        samesite="none" if is_prod else "lax",
     )
 
 
@@ -66,14 +63,15 @@ def _get_refresh_token(request: Request) -> str:
 # ---------------------------------------------------------------------------
 # Signup & Verify
 # ---------------------------------------------------------------------------
-@router.post("/signup", response_model=UserResponse, status_code=201)
-def signup(
-    req: SignupRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-):
+@router.post(
+    "/signup",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user",
+)
+@limiter.limit("5/minute")
+def signup(request: Request, req: SignupRequest, db: Session = Depends(get_db)):
     """Create a new unverified account and send a verification email."""
-    signup_limiter(request)
     return auth_service.signup(
         db=db,
         email=req.email,
@@ -82,11 +80,13 @@ def signup(
     )
 
 
-@router.post("/verify-email", response_model=UserResponse)
-def verify_email(
-    req: VerifyEmailRequest,
-    db: Session = Depends(get_db),
-):
+@router.post(
+    "/verify-email",
+    response_model=UserResponse,
+    summary="Verify user email address",
+)
+@limiter.limit("5/minute")
+def verify_email(request: Request, req: VerifyEmailRequest, db: Session = Depends(get_db)):
     """Verify an email address using a token."""
     return auth_service.verify_email(db=db, raw_token=req.token)
 
@@ -94,20 +94,17 @@ def verify_email(
 # ---------------------------------------------------------------------------
 # Login / Refresh / Logout
 # ---------------------------------------------------------------------------
-@router.post("/login", response_model=TokenResponse)
-def login(
-    req: LoginRequest,
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-):
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Log in",
+)
+@limiter.limit("10/minute")
+def login(request: Request, req: LoginRequest, response: Response, db: Session = Depends(get_db)):
     """Authenticate and create a session.
 
     Sets an HttpOnly cookie with the refresh token and returns the access JWT.
     """
-    # IP + Email rate limiting to prevent targeted attacks
-    login_limiter.check(login_limiter.ip_email_key(request, req.email))
-
     ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
@@ -123,7 +120,12 @@ def login(
     return TokenResponse(access_token=access_token, expires_in=expires_in)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Refresh access token",
+)
+@limiter.limit("20/minute")
 def refresh_session(
     request: Request,
     response: Response,
@@ -172,14 +174,18 @@ def logout_all(
 # ---------------------------------------------------------------------------
 # Password Reset
 # ---------------------------------------------------------------------------
-@router.post("/forgot-password", response_model=MessageResponse)
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    summary="Request a password reset link",
+)
+@limiter.limit("3/minute")
 def forgot_password(
-    req: ForgotPasswordRequest,
     request: Request,
+    req: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
     """Request a password reset email."""
-    forgot_password_limiter.check(forgot_password_limiter.ip_email_key(request, req.email))
     auth_service.request_password_reset(db=db, email=req.email)
     # Always return success to prevent email enumeration
     return MessageResponse(
@@ -188,7 +194,9 @@ def forgot_password(
 
 
 @router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("3/minute")
 def reset_password(
+    request: Request,
     req: ResetPasswordRequest,
     response: Response,
     db: Session = Depends(get_db),

@@ -7,9 +7,9 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import add_request_logging, setup_logging
+from app.core.rate_limit import setup_rate_limiting
 from app.db import engine
 from app.routes import api_v1
-
 
 settings = get_settings()
 
@@ -41,6 +41,7 @@ add_request_logging(app)
 
 # ── Error handlers ───────────────────────────────────────────────
 register_error_handlers(app)
+setup_rate_limiting(app)
 
 # ── Routers ──────────────────────────────────────────────────────
 app.include_router(api_v1, prefix=settings.api_v1_prefix)

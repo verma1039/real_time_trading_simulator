@@ -17,6 +17,13 @@ import Orders from './pages/Orders';
 import History from './pages/History';
 import Settings from './pages/Settings';
 
+import AdminGuard from './components/AdminGuard';
+
+import AdminDashboard from './pages/AdminDashboard';
+import AdminUsers from './pages/AdminUsers';
+import AdminUserDetails from './pages/AdminUserDetails';
+import AdminAuditLogs from './pages/AdminAuditLogs';
+
 // Temporary dummy page generator for incomplete routes
 const DummyPage = ({ title }) => (
   <div className="card max-w-4xl mx-auto mt-4">
@@ -52,6 +59,14 @@ const App = () => {
             <Route path="/orders" element={<Orders />} />
             <Route path="/history" element={<History />} />
             <Route path="/settings" element={<Settings />} />
+            
+            {/* Admin Routes */}
+            <Route element={<AdminGuard />}>
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/users/:userId" element={<AdminUserDetails />} />
+              <Route path="/admin/logs" element={<AdminAuditLogs />} />
+            </Route>
           </Route>
 
           {/* Catch-all redirect */}

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: trading-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    preDeployCommand: cd backend && alembic upgrade head
+    startCommand: cd backend && bash ./scripts/start.sh
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: ENVIRONMENT
+        value: production

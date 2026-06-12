@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentVerifiedUser
+from app.core.rate_limit import limiter
 from app.db import get_db
 from app.schemas.trading import (
     OrderCreateRequest,
@@ -22,13 +23,15 @@ def get_trading_service(db: Session = Depends(get_db)) -> TradingService:
 
 
 @router.post("/orders/simulate", response_model=OrderSimulateResponse)
+@limiter.limit("30/minute")
 async def simulate_order(
-    request: OrderCreateRequest,
+    request: Request,
+    req: OrderCreateRequest,
     current_user: CurrentVerifiedUser,
     db: Session = Depends(get_db),
     trading_service: TradingService = Depends(get_trading_service),
 ):
-    portfolio = get_user_portfolio_or_404(db, portfolio_id=request.portfolio_id if hasattr(request, 'portfolio_id') else None, user_id=current_user.id) if False else None # Wait, we need the default portfolio.
+    portfolio = get_user_portfolio_or_404(db, portfolio_id=req.portfolio_id if hasattr(req, 'portfolio_id') else None, user_id=current_user.id) if False else None # Wait, we need the default portfolio.
     # The get_user_portfolio_or_404 takes portfolio_id, but the user may not pass it.
     # From test_market_data.py, there's a default portfolio created. Let's just query the first portfolio.
     from sqlalchemy import select
@@ -38,12 +41,14 @@ async def simulate_order(
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Portfolio not found")
         
-    return await trading_service.simulate_market_order(portfolio.id, request)
+    return await trading_service.simulate_market_order(portfolio.id, req)
 
 
 @router.post("/orders", response_model=OrderResponse)
+@limiter.limit("20/minute")
 async def create_order(
-    request: OrderCreateRequest,
+    request: Request,
+    req: OrderCreateRequest,
     current_user: CurrentVerifiedUser,
     db: Session = Depends(get_db),
     trading_service: TradingService = Depends(get_trading_service),
@@ -55,7 +60,7 @@ async def create_order(
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Portfolio not found")
         
-    order = await trading_service.execute_market_order(portfolio.id, request)
+    order = await trading_service.execute_market_order(portfolio.id, req)
     return order
 
 

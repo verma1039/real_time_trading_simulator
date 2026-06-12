@@ -59,10 +59,8 @@ def db_session():
 
 @pytest.fixture(autouse=True)
 def clear_rate_limiters():
-    from app.core.rate_limit import login_limiter, signup_limiter, forgot_password_limiter
-    login_limiter._hits.clear()
-    signup_limiter._hits.clear()
-    forgot_password_limiter._hits.clear()
+    from app.core.rate_limit import limiter
+    limiter._storage.reset()
 
 
 @pytest.fixture()

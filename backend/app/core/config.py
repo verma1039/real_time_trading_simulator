@@ -30,6 +30,15 @@ class Settings(BaseSettings):
         ]
     )
 
+    @field_validator("frontend_origins", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",") if i.strip()]
+        if isinstance(v, (list, str)):
+            return v
+        raise ValueError(v)
+
     # ── JWT / Auth ───────────────────────────────────────────────
     jwt_secret: str = "CHANGE-ME-in-production"
     jwt_algorithm: str = "HS256"

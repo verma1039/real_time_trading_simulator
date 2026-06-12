@@ -9,9 +9,12 @@ import {
   History, 
   Settings,
   LogOut,
-  Menu
+  ShieldAlert,
+  Users,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import Badge from '../components/Badge';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -23,14 +26,21 @@ const navItems = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
+const adminNavItems = [
+  { path: '/admin', label: 'Admin Stats', icon: ShieldAlert },
+  { path: '/admin/users', label: 'Users', icon: Users },
+  { path: '/admin/logs', label: 'Audit Logs', icon: FileText },
+];
+
 const AppShell = () => {
   const { logout, user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <div className="d-flex flex-col md-d-flex flex-row h-screen bg-base">
       
       {/* Desktop Sidebar */}
-      <aside className="d-none md-d-flex flex-col w-full max-w-xs bg-surface border-r h-full p-4">
+      <aside className="d-none md-d-flex flex-col w-full max-w-xs bg-surface border-r h-full p-4 overflow-y-auto">
         <div className="d-flex items-center gap-3 mb-8 px-2">
           <div className="bg-primary rounded-md p-2">
             <ArrowRightLeft color="white" size={20} />
@@ -45,6 +55,7 @@ const AppShell = () => {
               <NavLink
                 key={item.path}
                 to={item.path}
+                end={item.path === '/'}
                 className={({ isActive }) => 
                   `d-flex items-center gap-3 px-4 py-3 rounded-md font-medium transition-default ${
                     isActive ? 'bg-primary text-surface shadow-sm' : 'text-secondary hover-bg'
@@ -56,6 +67,32 @@ const AppShell = () => {
               </NavLink>
             );
           })}
+
+          {isAdmin && (
+            <>
+              <div className="mt-4 mb-2 px-4 text-xs font-bold text-muted uppercase tracking-wider">
+                Admin Section
+              </div>
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === '/admin'}
+                    className={({ isActive }) => 
+                      `d-flex items-center gap-3 px-4 py-3 rounded-md font-medium transition-default ${
+                        isActive ? 'bg-danger text-surface shadow-sm' : 'text-danger hover-bg'
+                      }`
+                    }
+                  >
+                    <Icon size={20} />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         <div className="mt-auto pt-4 border-t">
@@ -86,14 +123,20 @@ const AppShell = () => {
             </div>
             <span className="font-bold text-primary">Antigravity</span>
           </div>
-          <NavLink to="/settings" className="p-2 text-secondary hover-bg rounded-md">
-            <Settings size={20} />
-          </NavLink>
+          <div className="d-flex items-center gap-2">
+            {isAdmin && <Badge variant="danger">ADMIN</Badge>}
+            <NavLink to="/settings" className="p-2 text-secondary hover-bg rounded-md">
+              <Settings size={20} />
+            </NavLink>
+          </div>
         </header>
 
         {/* Top Header (Desktop) */}
         <header className="d-none md-d-flex items-center justify-between p-4 bg-surface border-b z-sticky">
-          <h2 className="text-lg font-semibold text-primary">Trading Simulator</h2>
+          <h2 className="text-lg font-semibold text-primary d-flex items-center gap-3">
+            Trading Simulator
+            {isAdmin && <Badge variant="danger">ADMIN MODE</Badge>}
+          </h2>
         </header>
 
         {/* Scrollable Main Content */}
