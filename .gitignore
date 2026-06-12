@@ -1,10 +1,14 @@
-﻿# --------------------
+# --------------------
 # Python / Backend
 # --------------------
 backend/venv/
+.venv/
 __pycache__/
 *.pyc
+*.db
 .env
+.pytest_cache/
+.coverage
 
 # --------------------
 # Node / Frontend

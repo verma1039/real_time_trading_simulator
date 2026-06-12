@@ -1,6 +1,15 @@
-fastapi
-uvicorn
-requests
-python-dotenv
-sqlalchemy
-yfinance
+alembic==1.16.5
+argon2-cffi==25.1.0
+fastapi==0.128.0
+email-validator==2.2.0
+httpx==0.28.1
+psycopg[binary]==3.2.10
+pydantic-settings==2.12.0
+PyJWT==2.10.1
+python-dotenv==1.2.1
+sqlalchemy==2.0.50
+uvicorn[standard]==0.40.0
+yfinance==1.1.0
+
+# Development and CI
+pytest==9.0.2

@@ -1,92 +1,61 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
-from app.db import engine, SessionLocal
-from app import models
-from app.models import Wallet, Holding
-from app.database import wallet, holdings
+from app.core.config import get_settings
+from app.core.errors import register_error_handlers
+from app.core.logging import add_request_logging, setup_logging
+from app.db import engine
+from app.routes import api_v1
 
-from app.routes import (
-    instruments,
-    orders,
-    trades,
-    portfolio,
-    wallet as wallet_routes,
-    summary,
-    ws_prices,
-    ws_portfolio,
-    reset,
+
+settings = get_settings()
+
+# Initialise structured logging before anything else
+setup_logging(settings.log_level)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    engine.dispose()
+
+
+app = FastAPI(
+    title=settings.app_name,
+    version="0.2.0",
+    lifespan=lifespan,
 )
 
-from app.services.market_data import start_price_engine
-
-# -----------------------------
-# Create DB tables FIRST
-# -----------------------------
-models.Base.metadata.create_all(bind=engine)
-
-# -----------------------------
-# Initialize FastAPI
-# -----------------------------
-app = FastAPI(title="Trading Simulator API")
-
-# -----------------------------
-# START PRICE ENGINE (CORRECT WAY)
-# -----------------------------
-@app.on_event("startup")
-def startup_event():
-    start_price_engine()
-
-# -----------------------------
-# CORS (Frontend access)
-# -----------------------------
+# ── Middleware ────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=settings.frontend_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
+add_request_logging(app)
 
-# -----------------------------
-# Initialize DB session
-# -----------------------------
-db = SessionLocal()
+# ── Error handlers ───────────────────────────────────────────────
+register_error_handlers(app)
 
-# -----------------------------
-# Initialize persistent wallet
-# -----------------------------
-wallet_row = db.query(Wallet).first()
-if not wallet_row:
-    wallet_row = Wallet(balance=1_000_000.0)
-    db.add(wallet_row)
-    db.commit()
-    db.refresh(wallet_row)
+# ── Routers ──────────────────────────────────────────────────────
+app.include_router(api_v1, prefix=settings.api_v1_prefix)
 
-wallet["balance"] = wallet_row.balance
 
-# -----------------------------
-# Load holdings from DB
-# -----------------------------
-db_holdings = db.query(Holding).all()
-for h in db_holdings:
-    holdings[h.symbol] = {
-        "quantity": h.quantity,
-        "avgPrice": h.avg_price
-    }
+# ── System endpoints (outside /api/v1) ───────────────────────────
+@app.get("/health", tags=["system"])
+def health() -> dict[str, str]:
+    return {"status": "ok", "environment": settings.environment}
 
-# -----------------------------
-# Register routes
-# -----------------------------
-app.include_router(instruments.router)
-app.include_router(orders.router)
-app.include_router(trades.router)
-app.include_router(portfolio.router)
-app.include_router(wallet_routes.router)
-app.include_router(summary.router)
-app.include_router(ws_prices.router)
-app.include_router(ws_portfolio.router)
-app.include_router(reset.router)
+
+@app.get("/ready", tags=["system"])
+def readiness() -> dict[str, str]:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return {"status": "ready"}
+
+# touch

@@ -1,51 +1,37 @@
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
-from typing import List, Optional
+import uuid
 
-from app.database import instruments
-from app.services.market_data import get_live_price
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.core.deps import CurrentVerifiedUser
+from app.db import get_db
+from app.schemas.market_data import InstrumentResponse
+from app.services.instrument import get_instrument, search_instruments
+from app.core.errors import NotFoundError
 
 router = APIRouter()
 
 
-class Instrument(BaseModel):
-    symbol: str
-    exchange: str
-    instrumentType: str
-    lastTradedPrice: float
-
-
-class InstrumentsResponse(BaseModel):
-    total: int
-    page: int
-    limit: int
-    items: List[Instrument]
-
-
-@router.get("/api/v1/instruments", response_model=InstrumentsResponse)
-def get_instruments(
-    q: Optional[str] = None,
-    page: int = 1,
-    limit: int = Query(50, le=100),
+@router.get("/search", response_model=list[InstrumentResponse])
+def search(
+    query: str = Query(..., min_length=1),
+    limit: int = Query(20, le=100),
+    user: CurrentVerifiedUser = None,
+    db: Session = Depends(get_db),
 ):
-    data = instruments
+    """Search for instruments in the database."""
+    instruments = search_instruments(db, query, limit)
+    return instruments
 
-    if q:
-        data = [i for i in data if q.lower() in i["symbol"].lower()]
 
-    start = (page - 1) * limit
-    end = start + limit
-    page_items = data[start:end]
-
-    result = []
-    for i in page_items:
-        item = i.copy()
-        item["lastTradedPrice"] = round(get_live_price(item["symbol"]), 2)
-        result.append(item)
-
-    return {
-        "total": len(data),
-        "page": page,
-        "limit": limit,
-        "items": result,
-    }
+@router.get("/{instrument_id}", response_model=InstrumentResponse)
+def get_single_instrument(
+    instrument_id: uuid.UUID,
+    user: CurrentVerifiedUser = None,
+    db: Session = Depends(get_db),
+):
+    """Get instrument details by ID."""
+    instrument = get_instrument(db, instrument_id)
+    if not instrument:
+        raise NotFoundError("Instrument not found.")
+    return instrument
