@@ -23,6 +23,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
     VerifyEmailRequest,
+    ChangePasswordRequest,
 )
 from app.services import auth as auth_service
 
@@ -198,6 +199,21 @@ def reset_password(
     )
     _clear_refresh_cookie(response)
     return MessageResponse(message="Password reset successfully. Please log in.")
+
+
+@router.post("/change-password", response_model=MessageResponse)
+def change_password(
+    req: ChangePasswordRequest,
+    response: Response,
+    user: CurrentVerifiedUser,
+    db: Session = Depends(get_db),
+):
+    """Change password for an authenticated user and revoke all active sessions."""
+    auth_service.change_password(
+        db=db, user_id=user.id, current_password=req.current_password, new_password=req.new_password
+    )
+    _clear_refresh_cookie(response)
+    return MessageResponse(message="Password changed successfully. Please log in again.")
 
 
 # ---------------------------------------------------------------------------

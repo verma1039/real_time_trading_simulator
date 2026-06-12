@@ -40,3 +40,6 @@ class CandleResponse(BaseModel):
     low: Decimal
     close: Decimal
     volume: int
+
+class BatchQuoteRequest(BaseModel):
+    instrument_ids: list[uuid.UUID]

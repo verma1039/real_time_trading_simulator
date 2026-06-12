@@ -13,7 +13,9 @@ from app.schemas.portfolio import (
     HoldingResponse,
     PortfolioDetailResponse,
     PortfolioResponse,
+    PortfolioSnapshotResponse,
 )
+from datetime import date
 from app.services.portfolio import (
     calculate_portfolio_valuation,
     deposit_cash,
@@ -144,5 +146,29 @@ def get_ledger(
         .offset(offset)
         .limit(limit)
     ).scalars().all()
-    
     return entries
+
+@router.get("/{portfolio_id}/snapshots", response_model=list[PortfolioSnapshotResponse])
+def get_snapshots(
+    portfolio_id: uuid.UUID,
+    user: CurrentVerifiedUser,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    """Get the daily snapshots for a portfolio."""
+    # Ensure it belongs to user
+    get_user_portfolio_or_404(db, portfolio_id, user.id)
+    
+    from app.models import PortfolioSnapshot
+    query = select(PortfolioSnapshot).where(PortfolioSnapshot.portfolio_id == portfolio_id)
+    
+    if from_date:
+        query = query.where(PortfolioSnapshot.snapshot_date >= from_date)
+    if to_date:
+        query = query.where(PortfolioSnapshot.snapshot_date <= to_date)
+        
+    query = query.order_by(PortfolioSnapshot.snapshot_date.asc())
+    
+    snapshots = db.execute(query).scalars().all()
+    return snapshots

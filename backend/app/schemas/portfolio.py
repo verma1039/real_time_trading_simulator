@@ -67,3 +67,20 @@ class CashLedgerEntryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PortfolioSnapshotResponse(BaseModel):
+    id: uuid.UUID
+    portfolio_id: uuid.UUID
+    snapshot_date: date
+    cash_balance: Decimal
+    holdings_value: Decimal
+    total_portfolio_value: Decimal
+    invested_cost: Decimal
+    realized_pnl: Decimal
+    unrealized_pnl: Decimal
+    total_pnl: Decimal
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

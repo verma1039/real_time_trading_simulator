@@ -344,3 +344,30 @@ def confirm_password_reset(db: Session, *, raw_token: str, new_password: str) ->
     )
 
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Password reset — authenticated change
+# ---------------------------------------------------------------------------
+def change_password(db: Session, *, user_id: uuid.UUID, current_password: str, new_password: str) -> None:
+    """Change an authenticated user's password and revoke all their sessions."""
+    user = db.execute(
+        select(User).where(User.id == user_id)
+    ).scalar_one()
+
+    if not verify_password(current_password, user.password_hash):
+        raise BadRequestError("Incorrect current password.")
+
+    user.password_hash = hash_password(new_password)
+
+    # Revoke all sessions
+    db.execute(
+        update(LoginSession)
+        .where(
+            LoginSession.user_id == user.id,
+            LoginSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=utc_now())
+    )
+
+    db.commit()

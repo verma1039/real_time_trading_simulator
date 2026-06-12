@@ -19,6 +19,7 @@ from app.services.watchlist import (
     get_user_watchlist_or_404,
     get_user_watchlists,
     remove_instrument_from_watchlist,
+    delete_watchlist,
 )
 
 router = APIRouter()
@@ -51,6 +52,16 @@ def get_watchlist(
 ):
     """Get details of a specific watchlist."""
     return get_user_watchlist_or_404(db, watchlist_id, user.id)
+
+
+@router.delete("/{watchlist_id}", status_code=204)
+def delete_watchlist_route(
+    watchlist_id: uuid.UUID,
+    user: CurrentVerifiedUser,
+    db: Session = Depends(get_db),
+):
+    """Delete a watchlist."""
+    delete_watchlist(db, watchlist_id=watchlist_id, user_id=user.id)
 
 
 @router.post("/{watchlist_id}/items", response_model=WatchlistItemResponse)

@@ -80,3 +80,8 @@ def remove_instrument_from_watchlist(db: Session, *, watchlist_id: uuid.UUID, us
         
     db.delete(item)
     db.commit()
+
+def delete_watchlist(db: Session, *, watchlist_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    watchlist = get_user_watchlist_or_404(db, watchlist_id, user_id)
+    db.delete(watchlist)
+    db.commit()

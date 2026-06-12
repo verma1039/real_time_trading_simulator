@@ -238,3 +238,36 @@ def test_rate_limiting_signup(client: Any) -> None:
     assert resp.status_code == 429
     assert resp.json()["error"]["code"] == "RATE_LIMIT_EXCEEDED"
 
+
+def test_change_password_success(client: Any, verified_user: tuple[str, str]) -> None:
+    email, password = verified_user
+    login_resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    token = login_resp.json()["access_token"]
+
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": password, "new_password": "NewStrongPassword123"}
+    )
+    assert resp.status_code == 200
+
+    # Ensure we can login with the new password
+    login_resp2 = client.post("/api/v1/auth/login", json={"email": email, "password": "NewStrongPassword123"})
+    assert login_resp2.status_code == 200
+
+    # Ensure old password fails
+    login_resp3 = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert login_resp3.status_code == 401
+
+
+def test_change_password_wrong_current(client: Any, verified_user: tuple[str, str]) -> None:
+    email, password = verified_user
+    login_resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    token = login_resp.json()["access_token"]
+
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "WrongPassword", "new_password": "NewStrongPassword123"}
+    )
+    assert resp.status_code == 400

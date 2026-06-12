@@ -129,4 +129,13 @@ def test_authorization_bounds(client: TestClient, db_session: Session):
     assert resp.status_code == 404
 
 
+def test_get_snapshots(client: TestClient, db_session: Session):
+    auth_client, user_info = get_auth_client(client, db_session)
+    p_id = auth_client.get("/api/v1/portfolios/").json()[0]["id"]
+    
+    # Just verify the endpoint returns 200 and a list (even if empty, since we don't generate snapshots here)
+    resp = auth_client.get(f"/api/v1/portfolios/{p_id}/snapshots")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)
+
 

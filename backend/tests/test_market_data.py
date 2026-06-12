@@ -107,3 +107,15 @@ def test_get_historical_candles(client: TestClient, db_session, test_user_header
     assert len(data) == 1
     assert float(data[0]["open"]) == 150.0
     assert float(data[0]["close"]) == 152.0
+
+
+def test_get_batch_quotes(client: TestClient, db_session, test_user_headers):
+    res_search = client.get("/api/v1/instruments/search?query=RELIANCE", headers=test_user_headers)
+    instrument_id = res_search.json()[0]["id"]
+    
+    res = client.post("/api/v1/market-data/quotes/batch", headers=test_user_headers, json={"instrument_ids": [instrument_id]})
+    assert res.status_code == 200
+    quotes = res.json()
+    assert len(quotes) == 1
+    assert quotes[0]["symbol"] == "RELIANCE"
+    assert float(quotes[0]["price"]) == 150.5
