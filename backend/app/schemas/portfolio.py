@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.models import InstrumentType, LedgerEntryType
 
@@ -23,8 +23,7 @@ class HoldingResponse(BaseModel):
     quantity: int
     average_cost: Decimal
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PortfolioValuation(BaseModel):
@@ -46,8 +45,7 @@ class PortfolioResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PortfolioDetailResponse(PortfolioResponse):
@@ -65,8 +63,7 @@ class CashLedgerEntryResponse(BaseModel):
     description: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PortfolioSnapshotResponse(BaseModel):
     id: uuid.UUID
@@ -82,5 +79,4 @@ class PortfolioSnapshotResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

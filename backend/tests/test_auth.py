@@ -141,8 +141,8 @@ def test_refresh_success(client: Any, verified_user: tuple[str, str]) -> None:
     login_resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     old_cookie = login_resp.cookies.get("refresh_token")
     
-    # Use httpx cookies to pass it back
-    refresh_resp = client.post("/api/v1/auth/refresh", cookies={"refresh_token": old_cookie})
+    client.cookies.set("refresh_token", old_cookie)
+    refresh_resp = client.post("/api/v1/auth/refresh")
     assert refresh_resp.status_code == 200
     
     new_cookie = refresh_resp.cookies.get("refresh_token")
@@ -152,7 +152,8 @@ def test_refresh_success(client: Any, verified_user: tuple[str, str]) -> None:
 
 
 def test_refresh_invalid_token(client: Any) -> None:
-    resp = client.post("/api/v1/auth/refresh", cookies={"refresh_token": "fake_token"})
+    client.cookies.set("refresh_token", "fake_token")
+    resp = client.post("/api/v1/auth/refresh")
     assert resp.status_code == 401
 
 
@@ -165,14 +166,16 @@ def test_logout(client: Any, verified_user: tuple[str, str]) -> None:
     cookie = login_resp.cookies.get("refresh_token")
 
     # Logout
-    logout_resp = client.post("/api/v1/auth/logout", cookies={"refresh_token": cookie})
+    client.cookies.set("refresh_token", cookie)
+    logout_resp = client.post("/api/v1/auth/logout")
     assert logout_resp.status_code == 200
     
     # Cookie should be cleared (max_age=0 or empty)
     # Different clients handle cookie deletion differently, but generally it's cleared
     
     # Subsequent refresh should fail (revoked)
-    refresh_resp = client.post("/api/v1/auth/refresh", cookies={"refresh_token": cookie})
+    client.cookies.set("refresh_token", cookie)
+    refresh_resp = client.post("/api/v1/auth/refresh")
     assert refresh_resp.status_code == 401
 
 

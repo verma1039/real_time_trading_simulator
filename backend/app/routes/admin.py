@@ -1,7 +1,7 @@
 import uuid
 import csv
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -74,7 +74,7 @@ async def get_market_data_health(
             "provider_status": "OK",
             "quote_fetch_success": True,
             "response_latency_ms": round(latency_ms, 2),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
     except Exception as e:
         latency_ms = (time.time() - start_time) * 1000
@@ -83,7 +83,7 @@ async def get_market_data_health(
             "quote_fetch_success": False,
             "error_message": str(e),
             "response_latency_ms": round(latency_ms, 2),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
 
@@ -164,7 +164,7 @@ def suspend_user(
         raise HTTPException(status_code=400, detail="User already suspended")
     
     user.is_suspended = True
-    user.suspended_at = datetime.utcnow()
+    user.suspended_at = datetime.now(UTC)
     
     create_admin_log(
         db, admin.id, user.id, "SUSPEND", "USER", str(user.id), req.reason,
